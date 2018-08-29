@@ -1,0 +1,27 @@
+ChangeLog for package mySA
+
+changes in version 0.2 (2018-08-29)
+Restructured:
+  - Function has been restructured: code was simplified and computational
+    burden decreased by vectorised programming; output was restructured and input
+    arguments adapted accordingly. Old version as been kept as vbsa_old()
+
+changes in version 0.1.3 (2018-08-29)
+  - monitor_indices:
+  - Full sensitivity index matrices (N-by-K) can be returned if desired
+    instead of just the final indices after N resamplings.
+changed:
+  - initial release
+fixed:
+  - missing ChangeLog
+
+changes in version 0.1.2 (2018-08-28)
+parallel:
+  - Added argument 'ncores' to allow for parallel evaluation of fn (employs
+    package doMC; Linux only!)
+
+changes in version 0.1.1 (2018-08-28)
+  - param_names:
+  - Parameter names will be given to fn, i.e. the first argument of fn now
+    recieves a named vector of parameter realisation
+

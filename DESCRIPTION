@@ -1,0 +1,15 @@
+Package: mySA
+Type: Package
+Title: My personal functions for Sensitivity Analysis
+Description: Provides functions for Sensitivity Analyses. Adapted to my personal needs.
+Author: Tobias Pilz <tpilz@uni-potsdam.de>
+Maintainer: Tobias Pilz <tpilz@uni-potsdam.de>
+Depends: lhs,randtoolbox,doMC,parallel
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyLoad: yes
+Authors@R: c(person(given="Tobias", family="Pilz", email="tpilz@uni-potsdam.de", role=c("aut",
+           "cre", "cph")) )
+Version: 0.2
+Date: 2018-08-29
+RoxygenNote: 6.1.0
