@@ -6,8 +6,8 @@
 \usage{
 vbsa(fn, ..., lower = -Inf, upper = Inf, N = 1000,
   rtype = c("quasirandom", "lhs"), scrambling = c("Owen",
-  "Faure-Tezuka", "Owen+Faure-Tezuka", "none"), Nb = 1, Nb.sig = 0.05,
-  ncores = 1, verbose = TRUE, full.output = FALSE)
+  "Faure-Tezuka", "Owen+Faure-Tezuka", "none"), subsamp = NULL, Nb = 1,
+  Nb.sig = 0.05, ncores = 1, verbose = TRUE, full.output = FALSE)
 }
 \arguments{
 \item{fn}{character with the name of a valid R function to be analised.
@@ -31,6 +31,11 @@ Sobol' sequences) and 'lhs' (latin hypercube sampling)}
 
 \item{scrambling}{Shall scrambling be applied to the quasi-random sequences? 
 Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.}
+
+\item{subsamp}{If given, sensitivity indices will be calculated for
+(and optionally bootstraping be applied to) sub-samples of N to for monitoring of
+convergence. Either a vector of numeric values <= N or a single numeric value
+resulting in a sequence of subsamples \code{seq(subsamp, N, by = subsamp)}.}
 
 \item{Nb}{Number of bootstrapping samples to assess the robustness (i.e. a confidence
 interval) of calculated sensitivity indices. Default: 1 (i.e. bootstrapping is
@@ -96,6 +101,9 @@ A list with the following elements:
  *) St.boot                : Matrix of St bootstrapping distribution of dimension (Nb, K)
  
  *) B                      : Bootstrap matrix (indices for resampling of fn.A, fn.B, and fn.Ab) of dimension (N, Nb)
+ 
+ NOTE: if argument \code{subsamp} was given, each sensitivity index vector or matrix
+ as well as matrix B will be extended by a dimension giving the results for each the sub-sample.
 }
 \description{
 Variance based Sensitivity analysis for the input factors of a 

@@ -1,9 +1,23 @@
 
+# compute bootstraping samples of variance-based sensitivity indices based on fn output of matrices A, B and Ab
+indices_vb_boot <- function(yA, yB, yAb, N, Nb, K) {
+  
+  # get bootstrapping realisations (i.e. sampling matrix indices) as a matrix (N,Nb)
+  if(Nb > 1) {
+    B <- matrix(sample.int(N, N*Nb, replace = T), nrow = N, ncol = Nb, byrow = F)
+  } else {
+    B <- as.matrix(1:N)
+  }
+  
+  # use external function for computation of indices for each bootstrapping realisation
+  ind_out <- apply(B, 2, function(b) indices_vb(yA[b], yB[b], yAb[b,], K) )
+  
+  return(list(ind_out = ind_out, B = B))
+}
+
+
 # compute variance-based sensitivity indices based on fn output of matrices A, B and Ab
 indices_vb <- function(yA, yB, yAb, K) {
-  
-  # yAb as a matrix for more efficient calculations
-  #yAb_t <- matrix(yAb, ncol = K, byrow = T)
   
   # total variance, TODO: not really sure about this, in the SAFER implemantation it's var(yA)
   Vtot <- var(c(yA, yB))

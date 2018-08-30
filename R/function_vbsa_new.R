@@ -25,6 +25,11 @@
 #' @param scrambling Shall scrambling be applied to the quasi-random sequences? 
 #'  Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.
 #'  
+#' @param subsamp If given, sensitivity indices will be calculated for
+#' (and optionally bootstraping be applied to) sub-samples of N to for monitoring of
+#' convergence. Either a vector of numeric values <= N or a single numeric value
+#' resulting in a sequence of subsamples \code{seq(subsamp, N, by = subsamp)}.
+#'  
 #' @param Nb Number of bootstrapping samples to assess the robustness (i.e. a confidence
 #' interval) of calculated sensitivity indices. Default: 1 (i.e. bootstrapping is
 #' effectively not conducted). Note: This requires no additional evaluations of \code{fn}.
@@ -89,6 +94,9 @@
 #'  
 #'  *) B                      : Bootstrap matrix (indices for resampling of fn.A, fn.B, and fn.Ab) of dimension (N, Nb)
 #'  
+#'  NOTE: if argument \code{subsamp} was given, each sensitivity index vector or matrix
+#'  as well as matrix B will be extended by a dimension giving the results for each the sub-sample.
+#'  
 #' @references Theory:
 #'  
 #'  Andrea Saltelli, Paola Annoni, Ivano Azzini, Francesca Campolongo,
@@ -135,6 +143,7 @@ vbsa <- function(
   N=1000,
   rtype=c("quasirandom", "lhs"),   
   scrambling=c("Owen","Faure-Tezuka","Owen+Faure-Tezuka","none"),          # See ?randtoolbox::sobol
+  subsamp = NULL,
   Nb = 1,
   Nb.sig = 0.05,
   ncores=1,
@@ -195,6 +204,18 @@ vbsa <- function(
     X.Boundaries <- cbind(lower, upper)
     rownames(X.Boundaries) <- param.IDs
   } # IF end 
+  
+  # check for sub-sampling
+  if(!is.null(subsamp)) {
+    if(!is.numeric(subsamp)) stop("Argument 'subsamp' must be of type numeric or NULL!")
+    if(length(subsamp) == 1) {
+      subsamp <- seq(subsamp, N, by = subsamp)
+    }
+    if(max(subsamp) > N) stop("Maximum value of 'subsamp' must be <= N!")
+    if(max(subsamp) < N) subsamp <- c(subsamp, N)
+  } else {
+    subsamp <- N
+  }
   
   # Total Number of parameter sets to be used in the GSA
   nparamsets  <- N*(K+2)
@@ -258,48 +279,68 @@ vbsa <- function(
   # yAb as a matrix from here on
   yAb <- matrix(yAb, ncol = K, byrow = T)
   
-  # get bootstrapping realisations (i.e. sampling matrix indices) as a matrix (N,Nb)
-  if(Nb > 1) {
-    B <- matrix(sample.int(N, N*Nb, replace = T), nrow = N, ncol = Nb, byrow = F)
+  # calculate indices for each sub-sampling and bootstrapping realisation
+  ind_out <- lapply(subsamp, function(s) indices_vb_boot(yA[1:s], yB[1:s], yAb[1:s,], s, Nb, K))
+  
+  # convert output
+  Si <- sapply(ind_out, function(x) t(sapply(x$ind_out, function(y) y$Si)), simplify = "array")
+  if(dim(Si)[3] > 1) {
+    Si <- aperm(Si, perm = c(3,1,2))
+    dimnames(Si) <- list(subsamp, NULL, param.IDs)
   } else {
-    B <- as.matrix(1:N)
+    Si <- matrix(Si, ncol=K)
+    colnames(Si) <- param.IDs
   }
   
-  # for the next step a vectorised version of seq() would be nice ...
-  seq_vectorised <- Vectorize(seq.default, vectorize.args = c("from", "to"))
+  St <- sapply(ind_out, function(x) t(sapply(x$ind_out, function(y) y$St)), simplify = "array")
+  if(dim(St)[3] > 1) {
+    St <- aperm(St, perm = c(3,1,2))
+    dimnames(St) <- list(subsamp, NULL, param.IDs)
+  } else {
+    St <- matrix(St, ncol=K)
+    colnames(St) <- param.IDs
+  }
   
-  # use external function for computation of indices for each bootstrapping realisation
-  #ind_out <- apply(B, 2, function(b) indices_vb(yA[b], yB[b], yAb[c(seq_vectorised((b-1)*K+1, b*K))], K) )
-  ind_out <- apply(B, 2, function(b) indices_vb(yA[b], yB[b], yAb[b,], K) )
-  
-  Si <- t(sapply(ind_out, function(x) x$Si))
-  colnames(Si) <- param.IDs
-  St <- t(sapply(ind_out, function(x) x$St))
-  colnames(St) <- param.IDs
+  Boot <- lapply(ind_out, function(x) x$B)
+  names(Boot) <- subsamp
   
   
   #### OUTPUT ####
   if(verbose) message("[ Compile output ]")
   
   # generic output
+  if(length(dim(Si)) == 3) apply_dims <- c(1,3) else apply_dims <- 2
   out <- list(
     N = N,
     fn.counts = nparamsets,
-    Si = apply(Si, 2, mean),
-    St = apply(St, 2, mean)
+    Si = apply(Si, apply_dims, mean),
+    St = apply(St, apply_dims, mean)
   )
   if(Nb > 1) {
-    Si_sorted <- apply(Si, 2, sort)
-    St_sorted <- apply(St, 2, sort)
     n_min <- max(1, round(Nb * Nb.sig/2))
     n_max <- round(Nb * (1 - Nb.sig/2) )
+    if(length(dim(Si)) == 3) {
+      Si_sorted <- aperm(apply(Si, c(1,3), sort), c(2,1,3))
+      Si.lo <- Si_sorted[,n_min,]
+      Si.up <- Si_sorted[,n_max,]
+      St_sorted <- aperm(apply(St, c(1,3), sort), c(2,1,3))
+      St.lo <- St_sorted[,n_min,]
+      St.up <- St_sorted[,n_max,]
+    } else {
+      Si_sorted <- apply(Si, 2, sort)
+      Si.lo <- Si_sorted[n_min,]
+      Si.up <- Si_sorted[n_max,]
+      St_sorted <- apply(St, 2, sort)
+      St.lo <- St_sorted[n_min,]
+      St.up <- St_sorted[n_max,]
+    }
     out.distr <- list(
-      Si.sd = apply(Si, 2, sd),
-      Si.lo = Si_sorted[n_min,],
-      Si.up = Si_sorted[n_max,],
-      St.sd = apply(St, 2, sd),
-      St.lo = St_sorted[n_min,],
-      St.up = St_sorted[n_max,]
+      Si.sd = apply(Si, apply_dims, sd),
+      Si.lo = Si.lo,
+      Si.up = Si.up,
+      St.sd = apply(St, apply_dims, sd),
+      St.lo = St.lo,
+      St.up = St.up
     )
     out <- c(out, out.distr)
   }
@@ -320,7 +361,7 @@ vbsa <- function(
       out.distr <- list(
         Si.boot = Si,
         St.boot = St,
-        B = B
+        B = Boot
       )
       out <- c(out, out.distr)
     }
