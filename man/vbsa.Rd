@@ -6,8 +6,8 @@
 \usage{
 vbsa(fn, ..., lower = -Inf, upper = Inf, N = 1000,
   rtype = c("quasirandom", "lhs"), scrambling = c("Owen",
-  "Faure-Tezuka", "Owen+Faure-Tezuka", "none"), ncores = 1,
-  verbose = TRUE, full.output = FALSE)
+  "Faure-Tezuka", "Owen+Faure-Tezuka", "none"), Nb = 1, Nb.sig = 0.05,
+  ncores = 1, verbose = TRUE, full.output = FALSE)
 }
 \arguments{
 \item{fn}{character with the name of a valid R function to be analised.
@@ -32,6 +32,13 @@ Sobol' sequences) and 'lhs' (latin hypercube sampling)}
 \item{scrambling}{Shall scrambling be applied to the quasi-random sequences? 
 Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.}
 
+\item{Nb}{Number of bootstrapping samples to assess the robustness (i.e. a confidence
+interval) of calculated sensitivity indices. Default: 1 (i.e. bootstrapping is
+effectively not conducted). Note: This requires no additional evaluations of \code{fn}.}
+
+\item{Nb.sig}{Significance level defining upper and lower bounds of the confidence
+intervals of sensitivity indices. Default: 0.05. Only used if \code{Nb > 1}.}
+
 \item{ncores}{\code{integer} specifying the number of CPU cores to be used.
 If > 1, packages \code{\link[doMC]{doMC}} (Linux only!) and \code{\link[parallel]{parallel}}
 are needed. Values > 1 only useful if \code{fun} is very complex and computationally
@@ -50,11 +57,25 @@ A list with the following elements:
  
  *) fn.counts              : total number of model evaluations
  
- *) Si                     : First order sensitivity indices for each of the K input factors
+ *) Si                     : First order sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
  
- *) St                     : Total effects sensitivity indices for each of the K input factors
+ *) St                     : Total effects sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
  
- OPTIONAL if \code{full.output = TRUE}
+ If \code{Nb > 1} in addition:
+ 
+ *) Si.sd                  : Standard deviation of the Si bootrstapping distribution
+ 
+ *) Si.lo                  : Lower bound of the confidence interval of Si (defined by significance level \code{Nb.sig})
+
+ *) Si.up                  : Upper bound of the confidence interval of Si (defined by significance level \code{Nb.sig})
+ 
+ *) St.sd                  : Standard deviation of the St bootrstapping distribution
+ 
+ *) St.lo                  : Lower bound of the confidence interval of St (defined by significance level \code{Nb.sig})
+
+ *) St.up                  : Upper bound of the confidence interval of St (defined by significance level \code{Nb.sig})
+   
+ OPTIONAL (if \code{full.output = TRUE}):
 
  *) Matrix.A               : Sampling matrix A of dimension (N, K)
  
@@ -66,7 +87,15 @@ A list with the following elements:
  
  *) fn.B                   : N-dimensional vector of fn evaluations for Matrix B
  
- *) fn.Ab                  : N*K-dimensional vector of fn evaluations for Matrix Ab
+ *) fn.Ab                  : Matrix of fn evaluations for Matrix Ab of dimension (N, K)
+ 
+ If \code{Nb > 1} in addition:
+ 
+ *) Si.boot                : Matrix of Si bootstrapping distribution of dimension (Nb, K)
+ 
+ *) St.boot                : Matrix of St bootstrapping distribution of dimension (Nb, K)
+ 
+ *) B                      : Bootstrap matrix (indices for resampling of fn.A, fn.B, and fn.Ab) of dimension (N, Nb)
 }
 \description{
 Variance based Sensitivity analysis for the input factors of a 

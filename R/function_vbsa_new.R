@@ -24,6 +24,13 @@
 #' 
 #' @param scrambling Shall scrambling be applied to the quasi-random sequences? 
 #'  Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.
+#'  
+#' @param Nb Number of bootstrapping samples to assess the robustness (i.e. a confidence
+#' interval) of calculated sensitivity indices. Default: 1 (i.e. bootstrapping is
+#' effectively not conducted). Note: This requires no additional evaluations of \code{fn}.
+#' 
+#' @param Nb.sig Significance level defining upper and lower bounds of the confidence
+#' intervals of sensitivity indices. Default: 0.05. Only used if \code{Nb > 1}.
 #' 
 #' @param ncores \code{integer} specifying the number of CPU cores to be used.
 #' If > 1, packages \code{\link[doMC]{doMC}} (Linux only!) and \code{\link[parallel]{parallel}}
@@ -42,11 +49,25 @@
 #'  
 #'  *) fn.counts              : total number of model evaluations
 #'  
-#'  *) Si                     : First order sensitivity indices for each of the K input factors
+#'  *) Si                     : First order sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
 #'  
-#'  *) St                     : Total effects sensitivity indices for each of the K input factors
+#'  *) St                     : Total effects sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
 #'  
-#'  OPTIONAL if \code{full.output = TRUE}
+#'  If \code{Nb > 1} in addition:
+#'  
+#'  *) Si.sd                  : Standard deviation of the Si bootrstapping distribution
+#'  
+#'  *) Si.lo                  : Lower bound of the confidence interval of Si (defined by significance level \code{Nb.sig})
+#'
+#'  *) Si.up                  : Upper bound of the confidence interval of Si (defined by significance level \code{Nb.sig})
+#'  
+#'  *) St.sd                  : Standard deviation of the St bootrstapping distribution
+#'  
+#'  *) St.lo                  : Lower bound of the confidence interval of St (defined by significance level \code{Nb.sig})
+#'
+#'  *) St.up                  : Upper bound of the confidence interval of St (defined by significance level \code{Nb.sig})
+#'    
+#'  OPTIONAL (if \code{full.output = TRUE}):
 #' 
 #'  *) Matrix.A               : Sampling matrix A of dimension (N, K)
 #'  
@@ -58,7 +79,15 @@
 #'  
 #'  *) fn.B                   : N-dimensional vector of fn evaluations for Matrix B
 #'  
-#'  *) fn.Ab                  : N*K-dimensional vector of fn evaluations for Matrix Ab
+#'  *) fn.Ab                  : Matrix of fn evaluations for Matrix Ab of dimension (N, K)
+#'  
+#'  If \code{Nb > 1} in addition:
+#'  
+#'  *) Si.boot                : Matrix of Si bootstrapping distribution of dimension (Nb, K)
+#'  
+#'  *) St.boot                : Matrix of St bootstrapping distribution of dimension (Nb, K)
+#'  
+#'  *) B                      : Bootstrap matrix (indices for resampling of fn.A, fn.B, and fn.Ab) of dimension (N, Nb)
 #'  
 #' @references Theory:
 #'  
@@ -103,9 +132,11 @@ vbsa <- function(
   ...,
   lower=-Inf,
   upper=Inf,
-  N=1000,                         
+  N=1000,
   rtype=c("quasirandom", "lhs"),   
   scrambling=c("Owen","Faure-Tezuka","Owen+Faure-Tezuka","none"),          # See ?randtoolbox::sobol
+  Nb = 1,
+  Nb.sig = 0.05,
   ncores=1,
   verbose= TRUE,                  # logical, indicating if progress messages have to be printed          
   full.output=FALSE
@@ -224,18 +255,27 @@ vbsa <- function(
   #### Computation of sensitivity indices ####
   if(verbose) message("[ Calculate sensitivity indices ]")
   
-  # total variance, TODO: not really sure about this, in the SAFER implemantation it's var(yA)
-  Vtot <- var(c(yA, yB))
+  # yAb as a matrix from here on
+  yAb <- matrix(yAb, ncol = K, byrow = T)
   
-  # first order index, Table 2 (b)
-  Si <- sapply(1:N, function(n) yB[n] * (yAb[((n-1)*K+1):(n*K)] - yA[n]) )
-  Si <- apply(Si, 1, mean) / Vtot
-  names(Si) <- param.IDs
+  # get bootstrapping realisations (i.e. sampling matrix indices) as a matrix (N,Nb)
+  if(Nb > 1) {
+    B <- matrix(sample.int(N, N*Nb, replace = T), nrow = N, ncol = Nb, byrow = F)
+  } else {
+    B <- as.matrix(1:N)
+  }
   
-  # total effects index, Table 2 (f)
-  St <- sapply(1:N, function(n) (yA[n] - yAb[((n-1)*K+1):(n*K)])^2 )
-  St <- apply(St, 1, mean) / (2*Vtot)
-  names(St) <- param.IDs
+  # for the next step a vectorised version of seq() would be nice ...
+  seq_vectorised <- Vectorize(seq.default, vectorize.args = c("from", "to"))
+  
+  # use external function for computation of indices for each bootstrapping realisation
+  #ind_out <- apply(B, 2, function(b) indices_vb(yA[b], yB[b], yAb[c(seq_vectorised((b-1)*K+1, b*K))], K) )
+  ind_out <- apply(B, 2, function(b) indices_vb(yA[b], yB[b], yAb[b,], K) )
+  
+  Si <- t(sapply(ind_out, function(x) x$Si))
+  colnames(Si) <- param.IDs
+  St <- t(sapply(ind_out, function(x) x$St))
+  colnames(St) <- param.IDs
   
   
   #### OUTPUT ####
@@ -245,9 +285,24 @@ vbsa <- function(
   out <- list(
     N = N,
     fn.counts = nparamsets,
-    Si = Si,
-    St = St
+    Si = apply(Si, 2, mean),
+    St = apply(St, 2, mean)
   )
+  if(Nb > 1) {
+    Si_sorted <- apply(Si, 2, sort)
+    St_sorted <- apply(St, 2, sort)
+    n_min <- max(1, round(Nb * Nb.sig/2))
+    n_max <- round(Nb * (1 - Nb.sig/2) )
+    out.distr <- list(
+      Si.sd = apply(Si, 2, sd),
+      Si.lo = Si_sorted[n_min,],
+      Si.up = Si_sorted[n_max,],
+      St.sd = apply(St, 2, sd),
+      St.lo = St_sorted[n_min,],
+      St.up = St_sorted[n_max,]
+    )
+    out <- c(out, out.distr)
+  }
   
   # optional output
   if(full.output) {
@@ -260,6 +315,15 @@ vbsa <- function(
       fn.Ab = yAb
     )
     out <- c(out, out.opt)
+    
+    if(Nb > 1) {
+      out.distr <- list(
+        Si.boot = Si,
+        St.boot = St,
+        B = B
+      )
+      out <- c(out, out.distr)
+    }
   }
   
   if(verbose) message("[ DONE! ]")
