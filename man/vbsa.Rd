@@ -7,12 +7,14 @@
 vbsa(fn, ..., lower = -Inf, upper = Inf, N = 1000,
   rtype = c("quasirandom", "lhs"), scrambling = c("Owen",
   "Faure-Tezuka", "Owen+Faure-Tezuka", "none"), subsamp = NULL, Nb = 1,
-  Nb.sig = 0.05, ncores = 1, verbose = TRUE, full.output = FALSE)
+  Nb.sig = 0.05, ncores = 1, verbose = TRUE, full.output = FALSE,
+  na.handle = "stop", debug = FALSE)
 }
 \arguments{
 \item{fn}{character with the name of a valid R function to be analised.
 Its first argument MUST contain a K-dimensional variable representing the
-input factors to be analised.}
+input factors to be analised. Its output must always be a single value of
+type numeric!}
 
 \item{...}{additional arguments for 'fn'}
 
@@ -54,6 +56,19 @@ demanding, otherwise multiple thread handling will cause function slowdown! Defa
 \item{full.output}{logical, should the sampling matrices 'A' and 'B' along with all
 the input factor sets and its corresponding outputs of 'fn' be included in the output
 of this function? Default: \code{FALSE}.}
+
+\item{na.handle}{character. How to handle \code{NA} and non-finite values returned by \code{fn}?
+One of: \code{stop} - function will stop with an error (default); \code{remove} - problematic
+values are removed with a warning (affects N, fn.counts, A, B, Ab, fn.A, fn.B, fn.Ab)
+and the calculation of indices proceeded.}
+
+\item{debug}{logical. If \code{TRUE}, the function's complete internal environment
+will be saved for closer inspection. The following files will be written to \code{getwd()},
+unless an error occurred beforehand: \code{vbsa_backup1.RData} after initialisation
+and generation of sampling matrices; \code{vbsa_backup2.RData} after evaluation of
+\code{fn}; \code{vbsa_backup3.RData} after checking (and possibliy alterating if
+\code{na.handle = TRUE}) the output of \code{fn}; \code{vbsa_backup4.RData} after
+calculation of sensitivity indices, before compiling the output. Default: \code{FALSE}.}
 }
 \value{
 A list with the following elements:

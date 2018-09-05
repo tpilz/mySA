@@ -5,7 +5,8 @@
 #' 
 #' @param fn character with the name of a valid R function to be analised.
 #' Its first argument MUST contain a K-dimensional variable representing the
-#' input factors to be analised.
+#' input factors to be analised. Its output must always be a single value of
+#' type numeric!
 #' 
 #' @param ... additional arguments for 'fn'
 #' 
@@ -47,6 +48,19 @@
 #' @param full.output logical, should the sampling matrices 'A' and 'B' along with all
 #' the input factor sets and its corresponding outputs of 'fn' be included in the output
 #' of this function? Default: \code{FALSE}.
+#' 
+#' @param na.handle character. How to handle \code{NA} and non-finite values returned by \code{fn}?
+#' One of: \code{stop} - function will stop with an error (default); \code{remove} - problematic
+#' values are removed with a warning (affects N, fn.counts, A, B, Ab, fn.A, fn.B, fn.Ab)
+#' and the calculation of indices proceeded.
+#' 
+#' @param debug logical. If \code{TRUE}, the function's complete internal environment
+#' will be saved for closer inspection. The following files will be written to \code{getwd()},
+#' unless an error occurred beforehand: \code{vbsa_backup1.RData} after initialisation
+#' and generation of sampling matrices; \code{vbsa_backup2.RData} after evaluation of
+#' \code{fn}; \code{vbsa_backup3.RData} after checking (and possibliy alterating if
+#' \code{na.handle = TRUE}) the output of \code{fn}; \code{vbsa_backup4.RData} after
+#' calculation of sensitivity indices, before compiling the output. Default: \code{FALSE}.
 #' 
 #' @return A list with the following elements:
 #' 
@@ -148,7 +162,9 @@ vbsa <- function(
   Nb.sig = 0.05,
   ncores=1,
   verbose= TRUE,                  # logical, indicating if progress messages have to be printed          
-  full.output=FALSE
+  full.output=FALSE,
+  na.handle = "stop",
+  debug = FALSE
 ) {
 
   #### INPUT CHECKING AND INITIALISATIONS ####
@@ -175,6 +191,9 @@ vbsa <- function(
   
   # Checking that 'N' is integer
   if ( trunc(N) != N ) stop( "Invalid argument: 'N' must be integer !" )
+  
+  # check na.handle
+  if(!any(na.handle == c("stop", "remove"))) stop("Invalid argument: 'na.handle' must be one of {'stop', 'remove'}!")
   
   # checking 'X.Boundaries' 
   if ( (lower[1L] == -Inf) || (upper[1L] == Inf) ) {
@@ -250,19 +269,18 @@ vbsa <- function(
   colnames(B) <- param.IDs
   colnames(Ab) <- param.IDs
   
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup1.RData") 
+  
   
   #### Function evaluation at sample points ####
   
   if(ncores > 1) {
     if(verbose) message(paste("[ Evaluation of matrix A in parallel mode, involves", N, "calls of fn ]"))
-    yA <- mclapply(1:nrow(A), function(j) fn(A[j,], ...), mc.cores = ncores)
-    yA <- unlist(yA)
+    yA <- foreach(j=1:nrow(A), .combine = "c", .errorhandling = "pass") %dopar% fn(A[j,], ...)
     if(verbose) message(paste("[ Evaluation of matrix B in parallel mode, involves", N, "calls of fn ]"))
-    yB <- mclapply(1:nrow(B), function(j) fn(B[j,], ...), mc.cores = ncores)
-    yB <- unlist(yB)
+    yB <- foreach(j=1:nrow(B), .combine = "c", .errorhandling = "pass") %dopar% fn(B[j,], ...)
     if(verbose) message(paste("[ Evaluation of matrix Ab in parallel mode, involves", N*K, "calls of fn ]"))
-    yAb <- mclapply(1:nrow(Ab), function(j) fn(Ab[j,], ...), mc.cores = ncores)
-    yAb <- unlist(yAb)
+    yAb <- foreach(j=1:nrow(Ab), .combine = "c", .errorhandling = "pass") %dopar% fn(Ab[j,], ...)
   } else {
     if(verbose) message(paste("[ Evaluation of matrix A, involves", N, "calls of fn ]"))
     yA <- apply(A, 1, fn, ...)
@@ -271,6 +289,43 @@ vbsa <- function(
     if(verbose) message(paste("[ Evaluation of matrix Ab, involves", N*K, "calls of fn ]"))
     yAb <- apply(Ab, 1, fn, ...)
   }
+  
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup2.RData") 
+  
+  # check results
+  if(any(!is.numeric(c(yA, yB, yAb)))) {
+    stop("Evaluation of 'fn' produced unexpected non-numeric results! Check your 'fn' to always return a numeric value!")
+  }
+  if(length(yA) != N) stop("Evaluation of 'fn' returned more results than expected for matrix A!")
+  if(length(yB) != N) stop("Evaluation of 'fn' returned more results than expected for matrix B!")
+  if(length(yAb) != N*K) stop("Evaluation of 'fn' returned more results than expected for matrix Ab!")
+  if(any(!is.finite(c(yA, yB, yAb)))) {
+    if(na.handle == "stop") stop("Evaluation of 'fn' produced non-finite results! Consider argument 'na.handle'.")
+    
+    if(na.handle == "remove") {
+      n_na <- lapply(list(yA, yB, yAb), function(x) which(!is.finite(x)))
+      n_na[[3]] <- ceiling(n_na[[3]] / K)
+      n_na <- unique(unlist(n_na))
+      if(length(n_na) > 0.5*N) {
+        stop(paste("Evaluation of 'fn' produced many non-finite results! Stopping function as", length(n_na)/N*100, "% of N would have to be removed. Check your function and/or parameter ranges!"))
+      } else {
+        warning("Non-finite output of 'fn' detected! Removing problematic values and adapting parameters (check element N of output).")
+      }
+      N <- N - length(n_na)
+      if(!is.null(subsamp)) subsamp[length(subsamp)] <- N
+      nparamsets  <- N*(K+2)
+      A <- A[-n_na,]
+      yA <- yA[-n_na]
+      B <- B[-n_na,]
+      yB <- yB[-n_na]
+      # can be helpful here...
+      seq_vectorised <- Vectorize(seq.default, vectorize.args = c("from", "to"))
+      Ab <- Ab[-c(seq_vectorised((n_na-1)*K+1, n_na*K)),]
+      yAb <- yAb[-c(seq_vectorised((n_na-1)*K+1, n_na*K))]
+    }
+  }
+  
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup3.RData") 
   
   
   #### Computation of sensitivity indices ####
@@ -303,6 +358,8 @@ vbsa <- function(
   
   Boot <- lapply(ind_out, function(x) x$B)
   names(Boot) <- subsamp
+  
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup4.RData") 
   
   
   #### OUTPUT ####
