@@ -81,6 +81,8 @@ A list with the following elements:
  
  *) St                     : Total effects sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
  
+ *) ranking                : Importance ranking each of the K input factors according to Si
+ 
  If \code{Nb > 1} in addition:
  
  *) Si.sd                  : Standard deviation of the Si bootrstapping distribution
@@ -94,6 +96,8 @@ A list with the following elements:
  *) St.lo                  : Lower bound of the confidence interval of St (defined by significance level \code{Nb.sig})
 
  *) St.up                  : Upper bound of the confidence interval of St (defined by significance level \code{Nb.sig})
+ 
+ *) ranking.boot           : As ranking above, but for each bootstrapping sample
    
  OPTIONAL (if \code{full.output = TRUE}):
 

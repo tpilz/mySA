@@ -72,6 +72,8 @@
 #'  
 #'  *) St                     : Total effects sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
 #'  
+#'  *) ranking                : Importance ranking each of the K input factors according to Si
+#'  
 #'  If \code{Nb > 1} in addition:
 #'  
 #'  *) Si.sd                  : Standard deviation of the Si bootrstapping distribution
@@ -85,6 +87,8 @@
 #'  *) St.lo                  : Lower bound of the confidence interval of St (defined by significance level \code{Nb.sig})
 #'
 #'  *) St.up                  : Upper bound of the confidence interval of St (defined by significance level \code{Nb.sig})
+#'  
+#'  *) ranking.boot           : As ranking above, but for each bootstrapping sample
 #'    
 #'  OPTIONAL (if \code{full.output = TRUE}):
 #' 
@@ -373,6 +377,18 @@ vbsa <- function(
     Si = apply(Si, apply_dims, mean),
     St = apply(St, apply_dims, mean)
   )
+  
+  # parameter ranking based on Si
+  if(length(dim(Si)) > 2) {
+    ranks <- t(apply(out$Si, 1, order, decreasing = T))
+    colnames(ranks) <- colnames(out$Si)
+  } else {
+    ranks <- order(out$Si, decreasing = T)
+    names(ranks) <- names(out$Si)
+  }
+  out <- c(out, list(ranking = ranks))
+  
+  # Bootstrapping output
   if(Nb > 1) {
     n_min <- max(1, round(Nb * Nb.sig/2))
     n_max <- round(Nb * (1 - Nb.sig/2) )
@@ -400,6 +416,16 @@ vbsa <- function(
       St.up = St.up
     )
     out <- c(out, out.distr)
+    
+    # ranking
+    if(length(apply_dims) > 1) {
+      ranks.boot <- aperm(apply(Si, c(1,2), order, decreasing = T), c(3,1,2))
+      dimnames(ranks.boot)[[2]] <- param.IDs
+    } else {
+      ranks.boot <- t(apply(Si, 1, order, decreasing = T))
+      colnames(ranks.boot) <- param.IDs
+    }
+    out <- c(out, list(ranking.boot = ranks.boot))
   }
   
   # optional output
