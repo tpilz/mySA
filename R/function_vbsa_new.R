@@ -27,9 +27,10 @@
 #'  Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.
 #'  
 #' @param subsamp If given, sensitivity indices will be calculated for
-#' (and optionally bootstraping be applied to) sub-samples of N to for monitoring of
+#' (and optionally bootstraping be applied to) sub-samples of N for monitoring of
 #' convergence. Either a vector of numeric values <= N or a single numeric value
 #' resulting in a sequence of subsamples \code{seq(subsamp, N, by = subsamp)}.
+#' NOTE: Values of one make no sense and will be disregarded with a warning.
 #'  
 #' @param Nb Number of bootstrapping samples to assess the robustness (i.e. a confidence
 #' interval) of calculated sensitivity indices. Default: 1 (i.e. bootstrapping is
@@ -231,6 +232,11 @@ vbsa <- function(
   # check for sub-sampling
   if(!is.null(subsamp)) {
     if(!is.numeric(subsamp)) stop("Argument 'subsamp' must be of type numeric or NULL!")
+    if(any(subsamp == 1)) {
+      warning("Argument 'subsamp' should only contain values > 1. Values of 1 will be disregarded!")
+      subsamp <- subsamp[-which(subsamp == 1)]
+      if(length(subsamp) == 0) subsamp <- N
+    }
     if(length(subsamp) == 1) {
       subsamp <- seq(subsamp, N, by = subsamp)
     }

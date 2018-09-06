@@ -35,9 +35,10 @@ Sobol' sequences) and 'lhs' (latin hypercube sampling)}
 Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.}
 
 \item{subsamp}{If given, sensitivity indices will be calculated for
-(and optionally bootstraping be applied to) sub-samples of N to for monitoring of
+(and optionally bootstraping be applied to) sub-samples of N for monitoring of
 convergence. Either a vector of numeric values <= N or a single numeric value
-resulting in a sequence of subsamples \code{seq(subsamp, N, by = subsamp)}.}
+resulting in a sequence of subsamples \code{seq(subsamp, N, by = subsamp)}.
+NOTE: Values of one make no sense and will be disregarded with a warning.}
 
 \item{Nb}{Number of bootstrapping samples to assess the robustness (i.e. a confidence
 interval) of calculated sensitivity indices. Default: 1 (i.e. bootstrapping is
