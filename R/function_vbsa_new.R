@@ -425,8 +425,8 @@ vbsa <- function(
     
     # ranking
     if(length(apply_dims) > 1) {
-      ranks.boot <- aperm(apply(Si, c(1,2), order, decreasing = T), c(3,1,2))
-      dimnames(ranks.boot)[[2]] <- param.IDs
+      ranks.boot <- aperm(apply(Si, c(1,2), order, decreasing = T), c(2,3,1))
+      dimnames(ranks.boot)[[3]] <- param.IDs
     } else {
       ranks.boot <- t(apply(Si, 1, order, decreasing = T))
       colnames(ranks.boot) <- param.IDs
