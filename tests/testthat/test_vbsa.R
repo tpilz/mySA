@@ -122,3 +122,37 @@ test_that("specified parameter names occur in the output", {
   res_pars <- vbsa(fn = "ishigami", lower = pars_lower, upper = pars_upper)
   invisible(lapply(res_pars[c("Si", "St", "ranking")], function(x) expect_named(x, c("p1", "p2", "p3"))))
 })
+
+test_that("argument 'na.handle', i.e. handling of non-finite return values of 'fn' via internals.R:check_output() works as expected", {
+  res_full <- vbsa(fn = "ishigami", lower = pars_lower, upper = pars_upper, full.output = T)
+  res_full$fn.Ab <- c(t(res_full$fn.Ab)) # N*K vector as internally used before conversion to matrix
+  
+  res_check <- check_output(res_full$fn.A, res_full$fn.B, res_full$fn.Ab,
+                            res_full$Matrix.A, res_full$Matrix.B, res_full$Matrix.Ab,
+                            1000, nparam, NULL, 5000, "stop")
+  expect_equivalent(list(yA = res_full$fn.A, yB = res_full$fn.B, yAb = res_full$fn.Ab,
+                         A = res_full$Matrix.A, B = res_full$Matrix.B, Ab = res_full$Matrix.Ab,
+                         1000, 5000, NULL), res_check)
+  
+  res_full$fn.A[501] <- NA
+  res_full$fn.B[42] <- NaN
+  res_full$fn.Ab[242] <- Inf
+  res_full$fn.Ab[1503] <- -Inf
+  na_rm <- c(42,501,81)
+  na_rm_ab <- c(124:126, 241:243,1501:1503)
+  expect_error(check_output(res_full$fn.A, res_full$fn.B, res_full$fn.Ab,
+                            res_full$Matrix.A, res_full$Matrix.B, res_full$Matrix.Ab,
+                            1000, nparam, NULL, 5000, "stop"),
+               "Evaluation of 'fn' produced non-finite results!")
+  expect_warning(check_output(res_full$fn.A, res_full$fn.B, res_full$fn.Ab,
+                              res_full$Matrix.A, res_full$Matrix.B, res_full$Matrix.Ab,
+                              1000, nparam, NULL, 5000, "remove"),
+                 "Non-finite output of 'fn' detected!")
+  res_check_rm <- suppressWarnings(check_output(res_full$fn.A, res_full$fn.B, res_full$fn.Ab,
+                                                res_full$Matrix.A, res_full$Matrix.B, res_full$Matrix.Ab,
+                                                1000, nparam, NULL, 5000, "remove"))
+  expect_equivalent(list(yA = res_full$fn.A[-na_rm], yB = res_full$fn.B[-na_rm], yAb = res_full$fn.Ab[-na_rm_ab],
+                         A = res_full$Matrix.A[-na_rm,], B = res_full$Matrix.B[-na_rm,], Ab = res_full$Matrix.Ab[-na_rm_ab,],
+                         N = 997, nparamsets = 997*(nparam+2), subsamp = NULL),
+                    res_check_rm)
+})
