@@ -5,6 +5,20 @@ context("Function vbsa()")
 ishigami <- function(x, a=7, b=0.1) {
   sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) 
 }
+
+# simple Ishigami test function with multivariate output
+ishigami_multi <- function(x, a=7, b=0.1) {
+  res <- sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) 
+  a=6
+  b=0.15
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  a=8
+  b=0.05
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  names(res) <- c("res1", "res2", "res3")
+  return(res)
+}
+
 nparam <- 3
 pars_lower <- rep(-pi, nparam)
 pars_upper <- rep(pi, nparam)
@@ -155,4 +169,15 @@ test_that("argument 'na.handle', i.e. handling of non-finite return values of 'f
                          A = res_full$Matrix.A[-na_rm,], B = res_full$Matrix.B[-na_rm,], Ab = res_full$Matrix.Ab[-na_rm_ab,],
                          N = 997, nparamsets = 997*(nparam+2), subsamp = NULL),
                     res_check_rm)
+})
+
+test_that("multivariate output of 'fn' can be handled as expected", {
+  expect_message(vbsa(fn = "ishigami_multi", lower = pars_lower, upper = pars_upper, verbose = T),
+                 "NOTE: found multivariate output of 'fn' calls")
+  
+  res_multivar <- vbsa(fn = "ishigami_multi", lower = pars_lower, upper = pars_upper)
+  expect_type(res_multivar, "list")
+  expect_length(res_multivar, 3)
+  invisible(lapply(res_multivar, function(x) expect_length(x, 5)))
+  expect_named(res_multivar, c("res1", "res2", "res3"))
 })

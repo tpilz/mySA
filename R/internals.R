@@ -1,3 +1,141 @@
+# function for checking of fn output, calculation of sensitivity indices, and (pre-)compilation of output
+eval_fn <- function(yA, yB, yAb) {
+  
+  # check (and optionally adjust) output of fn
+  checked <- check_output(yA, yB, yAb, A, B, Ab, N, K, subsamp, nparamsets, na.handle)
+  yA <- checked$yA
+  yB <- checked$yB
+  yAb <- checked$yAb
+  A <- checked$A
+  B <- checked$B
+  Ab <- checked$Ab
+  N <- checked$N
+  subsamp <- checked$subsamp
+  nparamsets <- checked$nparamsets
+  
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup3.RData") 
+  
+  
+  #### Computation of sensitivity indices ####
+  if(verbose) message("[ Calculate sensitivity indices ]")
+  
+  # yAb as a matrix from here on
+  yAb <- matrix(yAb, ncol = K, byrow = T)
+  
+  # calculate indices for each sub-sampling and bootstrapping realisation
+  ind_out <- lapply(subsamp, function(s) indices_vb_boot(yA[1:s], yB[1:s], yAb[1:s,], s, Nb, K))
+  
+  # convert output
+  Si <- sapply(ind_out, function(x) t(sapply(x$ind_out, function(y) y$Si)), simplify = "array")
+  if(dim(Si)[3] > 1) {
+    Si <- aperm(Si, perm = c(3,1,2))
+    dimnames(Si) <- list(subsamp, NULL, param.IDs)
+  } else {
+    Si <- matrix(Si, ncol=K)
+    colnames(Si) <- param.IDs
+  }
+  
+  St <- sapply(ind_out, function(x) t(sapply(x$ind_out, function(y) y$St)), simplify = "array")
+  if(dim(St)[3] > 1) {
+    St <- aperm(St, perm = c(3,1,2))
+    dimnames(St) <- list(subsamp, NULL, param.IDs)
+  } else {
+    St <- matrix(St, ncol=K)
+    colnames(St) <- param.IDs
+  }
+  
+  Boot <- lapply(ind_out, function(x) x$B)
+  names(Boot) <- subsamp
+  
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup4.RData") 
+  
+  
+  #### OUTPUT ####
+  if(verbose) message("[ Compile output ]")
+  
+  # generic output
+  if(length(dim(Si)) == 3) apply_dims <- c(1,3) else apply_dims <- 2
+  out <- list(
+    N = N,
+    fn.counts = nparamsets,
+    Si = apply(Si, apply_dims, mean),
+    St = apply(St, apply_dims, mean)
+  )
+  
+  # parameter ranking based on Si
+  if(length(dim(Si)) > 2) {
+    ranks <- t(apply(out$Si, 1, order, decreasing = T))
+    colnames(ranks) <- colnames(out$Si)
+  } else {
+    ranks <- order(out$Si, decreasing = T)
+    names(ranks) <- names(out$Si)
+  }
+  out <- c(out, list(ranking = ranks))
+  
+  # Bootstrapping output
+  if(Nb > 1) {
+    n_min <- max(1, round(Nb * Nb.sig/2))
+    n_max <- round(Nb * (1 - Nb.sig/2) )
+    if(length(dim(Si)) == 3) {
+      Si_sorted <- aperm(apply(Si, c(1,3), sort), c(2,1,3))
+      Si.lo <- Si_sorted[,n_min,]
+      Si.up <- Si_sorted[,n_max,]
+      St_sorted <- aperm(apply(St, c(1,3), sort), c(2,1,3))
+      St.lo <- St_sorted[,n_min,]
+      St.up <- St_sorted[,n_max,]
+    } else {
+      Si_sorted <- apply(Si, 2, sort)
+      Si.lo <- Si_sorted[n_min,]
+      Si.up <- Si_sorted[n_max,]
+      St_sorted <- apply(St, 2, sort)
+      St.lo <- St_sorted[n_min,]
+      St.up <- St_sorted[n_max,]
+    }
+    out.distr <- list(
+      Si.sd = apply(Si, apply_dims, sd),
+      Si.lo = Si.lo,
+      Si.up = Si.up,
+      St.sd = apply(St, apply_dims, sd),
+      St.lo = St.lo,
+      St.up = St.up
+    )
+    out <- c(out, out.distr)
+    
+    # ranking
+    if(length(apply_dims) > 1) {
+      ranks.boot <- aperm(apply(Si, c(1,2), order, decreasing = T), c(2,3,1))
+      dimnames(ranks.boot)[[3]] <- param.IDs
+    } else {
+      ranks.boot <- t(apply(Si, 1, order, decreasing = T))
+      colnames(ranks.boot) <- param.IDs
+    }
+    out <- c(out, list(ranking.boot = ranks.boot))
+  }
+  
+  # optional output
+  if(full.output) {
+    out.opt <- list(
+      Matrix.A = A,
+      Matrix.B = B,
+      Matrix.Ab = Ab,
+      fn.A = yA,
+      fn.B = yB,
+      fn.Ab = yAb
+    )
+    out <- c(out, out.opt)
+    
+    if(Nb > 1) {
+      out.distr <- list(
+        Si.boot = Si,
+        St.boot = St,
+        B = Boot
+      )
+      out <- c(out, out.distr)
+    }
+  }
+  
+  return(out)
+}
 
 # compute bootstraping samples of variance-based sensitivity indices based on fn output of matrices A, B and Ab
 indices_vb_boot <- function(yA, yB, yAb, N, Nb, K) {

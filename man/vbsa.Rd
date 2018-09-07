@@ -13,8 +13,9 @@ vbsa(fn, ..., lower = -Inf, upper = Inf, N = 1000,
 \arguments{
 \item{fn}{character with the name of a valid R function to be analised.
 Its first argument MUST contain a K-dimensional variable representing the
-input factors to be analised. Its output must always be a single value of
-type numeric!}
+input factors to be analised. Its output must either be a single value of
+type numeric or an optionally named numeric vector. If the latter, sensitivity
+indices will be calculated and output be compiled for each of the fn outputs.}
 
 \item{...}{additional arguments for 'fn'}
 
@@ -72,7 +73,7 @@ and generation of sampling matrices; \code{vbsa_backup2.RData} after evaluation 
 calculation of sensitivity indices, before compiling the output. Default: \code{FALSE}.}
 }
 \value{
-A list with the following elements:
+For each output of \code{fn} an optionally named (sub-)list with the following elements:
 
  *) N                      : number of input factor samples employed in the SA
  
