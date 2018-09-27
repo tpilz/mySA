@@ -287,18 +287,18 @@ vbsa <- function(
   
   if(ncores > 1) {
     if(verbose) message(paste("[ Evaluation of matrix A in parallel mode, involves", N, "calls of fn ]"))
-    yA <- foreach(j=1:nrow(A), .combine = "c", .errorhandling = "pass") %dopar% fn(A[j,], ...)
+    yA <- foreach(j=1:nrow(A), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(A[j,], ...))
     if(verbose) message(paste("[ Evaluation of matrix B in parallel mode, involves", N, "calls of fn ]"))
-    yB <- foreach(j=1:nrow(B), .combine = "c", .errorhandling = "pass") %dopar% fn(B[j,], ...)
+    yB <- foreach(j=1:nrow(B), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(B[j,], ...))
     if(verbose) message(paste("[ Evaluation of matrix Ab in parallel mode, involves", N*K, "calls of fn ]"))
-    yAb <- foreach(j=1:nrow(Ab), .combine = "c", .errorhandling = "pass") %dopar% fn(Ab[j,], ...)
+    yAb <- foreach(j=1:nrow(Ab), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(Ab[j,], ...))
   } else {
     if(verbose) message(paste("[ Evaluation of matrix A, involves", N, "calls of fn ]"))
-    yA <- apply(A, 1, fn, ...)
+    yA <- apply(A, 1, function(x) unlist(fn(x, ...)))
     if(verbose) message(paste("[ Evaluation of matrix B, involves", N, "calls of fn ]"))
-    yB <- apply(B, 1, fn, ...)
+    yB <- apply(B, 1, function(x) unlist(fn(x, ...)))
     if(verbose) message(paste("[ Evaluation of matrix Ab, involves", N*K, "calls of fn ]"))
-    yAb <- apply(Ab, 1, fn, ...)
+    yAb <- apply(Ab, 1, function(x) unlist(fn(x, ...)))
   }
   
   if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup2.RData") 
@@ -307,13 +307,13 @@ vbsa <- function(
   environment(eval_fn) <- environment()
   
   # evaluate and compile SA results for each output function of fn
-  if(is.matrix(yA)) {
+  if(all(is.matrix(yA), is.matrix(yB), is.matrix(yAb))) {
     if(verbose) message("[ NOTE: found multivariate output of 'fn' calls ]")
     out <- lapply(1:nrow(yA), function(i) eval_fn(yA[i,], yB[i,], yAb[i,]))
     names(out) <- rownames(yA)
-  } else {
+  } else if(all(is.vector(yA, mode = "numeric"), is.vector(yB, mode = "numeric"), is.vector(yAb, mode = "numeric"))){
     out <- eval_fn(yA, yB, yAb)
-  }
+  } else stop("Outputs of 'fn' (objects yA, yB, yAb) are of unexpected types (expected all to be vectors or matrices)! Consider argument 'debug'.")
   
   if(verbose) message("[ DONE! ]")
   return(out)

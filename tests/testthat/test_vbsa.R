@@ -18,6 +18,33 @@ ishigami_multi <- function(x, a=7, b=0.1) {
   names(res) <- c("res1", "res2", "res3")
   return(res)
 }
+ishigami_multi_list <- function(x, a=7, b=0.1) {
+  res <- sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) 
+  a=6
+  b=0.15
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  a=8
+  b=0.05
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  names(res) <- c("res1", "res2", "res3")
+  return(as.list(res))
+}
+ishigami_multi_list_err <- function(x, a=7, b=0.1) {
+  res <- sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) 
+  a=6
+  b=0.15
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  a=8
+  b=0.05
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  names(res) <- c("res1", "res2", "res3")
+  # introduce random error
+  if(runif(1) < 0.1) {
+    res <- as.list(res)
+    res[[2]] <- c("bla", "bla2")
+  }
+  return(res)
+}
 
 nparam <- 3
 pars_lower <- rep(-pi, nparam)
@@ -180,4 +207,17 @@ test_that("multivariate output of 'fn' can be handled as expected", {
   expect_length(res_multivar, 3)
   invisible(lapply(res_multivar, function(x) expect_length(x, 5)))
   expect_named(res_multivar, c("res1", "res2", "res3"))
+})
+
+test_that("multivariate output of type list of 'fn' can be handled as expected", {
+  res_multivar_list <- vbsa(fn = "ishigami_multi_list", lower = pars_lower, upper = pars_upper)
+  expect_type(res_multivar_list, "list")
+  expect_length(res_multivar_list, 3)
+  invisible(lapply(res_multivar_list, function(x) expect_length(x, 5)))
+  expect_named(res_multivar_list, c("res1", "res2", "res3"))
+})
+
+test_that("unsupported output types of 'fn' are catched", {
+  expect_error(vbsa(fn = "ishigami_multi_list_err", lower = pars_lower, upper = pars_upper),
+               "Outputs of 'fn' (objects yA, yB, yAb) are of unexpected types", fixed =T)
 })
