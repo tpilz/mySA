@@ -84,7 +84,7 @@ For each output of \code{fn} an optionally named (sub-)list with the following e
 
  *) St                     : Total effects sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
 
- *) ranking                : Importance ranking each of the K input factors according to Si
+ *) ranking                : Importance ranking of input factors from 1 (highest) to K (lowest importance) according to Si
 
  If \code{Nb > 1} in addition:
 

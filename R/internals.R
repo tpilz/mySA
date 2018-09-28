@@ -64,11 +64,11 @@ eval_fn <- function(yA, yB, yAb) {
 
   # parameter ranking based on Si
   if(length(dim(Si)) > 2) {
-    ranks <- t(apply(out$Si, 1, order, decreasing = T))
-    colnames(ranks) <- colnames(out$Si)
+    ranks <- t(apply(out$Si, 1, function(x)  match(param.IDs, param.IDs[order(x, decreasing = T)])))
+    colnames(ranks) <- param.IDs
   } else {
-    ranks <- order(out$Si, decreasing = T)
-    names(ranks) <- names(out$Si)
+    ranks <- match(param.IDs, param.IDs[order(out$Si, decreasing = T)])
+    names(ranks) <- param.IDs
   }
   out <- c(out, list(ranking = ranks))
 
@@ -103,10 +103,10 @@ eval_fn <- function(yA, yB, yAb) {
 
     # ranking
     if(length(apply_dims) > 1) {
-      ranks.boot <- aperm(apply(Si, c(1,2), order, decreasing = T), c(2,3,1))
+      ranks.boot <- aperm(apply(Si, c(1,2), function(x)  match(param.IDs, param.IDs[order(x, decreasing = T)])), c(2,3,1))
       dimnames(ranks.boot)[[3]] <- param.IDs
     } else {
-      ranks.boot <- t(apply(Si, 1, order, decreasing = T))
+      ranks.boot <- t(apply(Si, 1, function(x)  match(param.IDs, param.IDs[order(x, decreasing = T)])))
       colnames(ranks.boot) <- param.IDs
     }
     out <- c(out, list(ranking.boot = ranks.boot))
