@@ -1,6 +1,6 @@
 # function for checking of fn output, calculation of sensitivity indices, and (pre-)compilation of output
 eval_fn <- function(yA, yB, yAb) {
-  
+
   # check (and optionally adjust) output of fn
   checked <- check_output(yA, yB, yAb, A, B, Ab, N, K, subsamp, nparamsets, na.handle)
   yA <- checked$yA
@@ -12,19 +12,19 @@ eval_fn <- function(yA, yB, yAb) {
   N <- checked$N
   subsamp <- checked$subsamp
   nparamsets <- checked$nparamsets
-  
-  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup3.RData") 
-  
-  
+
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup3.RData")
+
+
   #### Computation of sensitivity indices ####
   if(verbose) message("[ Calculate sensitivity indices ]")
-  
+
   # yAb as a matrix from here on
   yAb <- matrix(yAb, ncol = K, byrow = T)
-  
+
   # calculate indices for each sub-sampling and bootstrapping realisation
   ind_out <- lapply(subsamp, function(s) indices_vb_boot(yA[1:s], yB[1:s], yAb[1:s,], s, Nb, K))
-  
+
   # convert output
   Si <- sapply(ind_out, function(x) t(sapply(x$ind_out, function(y) y$Si)), simplify = "array")
   if(dim(Si)[3] > 1) {
@@ -34,7 +34,7 @@ eval_fn <- function(yA, yB, yAb) {
     Si <- matrix(Si, ncol=K)
     colnames(Si) <- param.IDs
   }
-  
+
   St <- sapply(ind_out, function(x) t(sapply(x$ind_out, function(y) y$St)), simplify = "array")
   if(dim(St)[3] > 1) {
     St <- aperm(St, perm = c(3,1,2))
@@ -43,16 +43,16 @@ eval_fn <- function(yA, yB, yAb) {
     St <- matrix(St, ncol=K)
     colnames(St) <- param.IDs
   }
-  
+
   Boot <- lapply(ind_out, function(x) x$B)
   names(Boot) <- subsamp
-  
-  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup4.RData") 
-  
-  
+
+  if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup4.RData")
+
+
   #### OUTPUT ####
   if(verbose) message("[ Compile output ]")
-  
+
   # generic output
   if(length(dim(Si)) == 3) apply_dims <- c(1,3) else apply_dims <- 2
   out <- list(
@@ -61,7 +61,7 @@ eval_fn <- function(yA, yB, yAb) {
     Si = apply(Si, apply_dims, mean),
     St = apply(St, apply_dims, mean)
   )
-  
+
   # parameter ranking based on Si
   if(length(dim(Si)) > 2) {
     ranks <- t(apply(out$Si, 1, order, decreasing = T))
@@ -71,16 +71,16 @@ eval_fn <- function(yA, yB, yAb) {
     names(ranks) <- names(out$Si)
   }
   out <- c(out, list(ranking = ranks))
-  
+
   # Bootstrapping output
   if(Nb > 1) {
     n_min <- max(1, round(Nb * Nb.sig/2))
     n_max <- round(Nb * (1 - Nb.sig/2) )
     if(length(dim(Si)) == 3) {
-      Si_sorted <- aperm(apply(Si, c(1,3), sort), c(2,1,3))
+      Si_sorted <- aperm(apply(Si, c(1,3), sort, na.last = F), c(2,1,3))
       Si.lo <- Si_sorted[,n_min,]
       Si.up <- Si_sorted[,n_max,]
-      St_sorted <- aperm(apply(St, c(1,3), sort), c(2,1,3))
+      St_sorted <- aperm(apply(St, c(1,3), sort, na.last = F), c(2,1,3))
       St.lo <- St_sorted[,n_min,]
       St.up <- St_sorted[,n_max,]
     } else {
@@ -100,7 +100,7 @@ eval_fn <- function(yA, yB, yAb) {
       St.up = St.up
     )
     out <- c(out, out.distr)
-    
+
     # ranking
     if(length(apply_dims) > 1) {
       ranks.boot <- aperm(apply(Si, c(1,2), order, decreasing = T), c(2,3,1))
@@ -111,7 +111,7 @@ eval_fn <- function(yA, yB, yAb) {
     }
     out <- c(out, list(ranking.boot = ranks.boot))
   }
-  
+
   # optional output
   if(full.output) {
     out.opt <- list(
@@ -123,7 +123,7 @@ eval_fn <- function(yA, yB, yAb) {
       fn.Ab = yAb
     )
     out <- c(out, out.opt)
-    
+
     if(Nb > 1) {
       out.distr <- list(
         Si.boot = Si,
@@ -133,41 +133,43 @@ eval_fn <- function(yA, yB, yAb) {
       out <- c(out, out.distr)
     }
   }
-  
+
   return(out)
 }
 
 # compute bootstraping samples of variance-based sensitivity indices based on fn output of matrices A, B and Ab
 indices_vb_boot <- function(yA, yB, yAb, N, Nb, K) {
-  
+
   # get bootstrapping realisations (i.e. sampling matrix indices) as a matrix (N,Nb)
   if(Nb > 1) {
     B <- matrix(sample.int(N, N*Nb, replace = T), nrow = N, ncol = Nb, byrow = F)
   } else {
     B <- as.matrix(1:N)
   }
-  
+
   # use external function for computation of indices for each bootstrapping realisation
   ind_out <- apply(B, 2, function(b) indices_vb(yA[b], yB[b], yAb[b,], K) )
-  
+
   return(list(ind_out = ind_out, B = B))
 }
 
 
 # compute variance-based sensitivity indices based on fn output of matrices A, B and Ab
 indices_vb <- function(yA, yB, yAb, K) {
-  
+
   # total variance, TODO: not really sure about this, in the SAFER implemantation it's var(yA)
   Vtot <- var(c(yA, yB))
-  
+
+  if(Vtot == 0) return(list(Si = rep(NA, K), St = rep(NA, K)))
+
   # first order index, Table 2 (b)
   Si <- yB * (yAb - yA)
   Si <- apply(Si, 2, mean) / Vtot
-  
+
   # total effects index, Table 2 (f)
   St <- (yA - yAb)^2
   St <- apply(St, 2, mean) / (2*Vtot)
-  
+
   return(list(Si = Si, St = St))
 }
 
@@ -183,7 +185,7 @@ check_output <- function(yA, yB, yAb, A, B, Ab, N, K, subsamp, nparamsets, na.ha
   if(length(yAb) != N*K) stop("Evaluation of 'fn' returned more results than expected for matrix Ab!")
   if(any(!is.finite(c(yA, yB, yAb)))) {
     if(na.handle == "stop") stop("Evaluation of 'fn' produced non-finite results! Consider argument 'na.handle'.")
-    
+
     if(na.handle == "remove") {
       n_na <- lapply(list(yA, yB, yAb), function(x) which(!is.finite(x)))
       n_na[[3]] <- ceiling(n_na[[3]] / K)
@@ -206,7 +208,7 @@ check_output <- function(yA, yB, yAb, A, B, Ab, N, K, subsamp, nparamsets, na.ha
       yAb <- yAb[-c(seq_vectorised((n_na-1)*K+1, n_na*K))]
     }
   }
-  
+
   return(list(yA = yA, yB=yB, yAb=yAb,
               A = A, B = B, Ab = Ab,
               N = N, nparamsets = nparamsets, subsamp = subsamp))

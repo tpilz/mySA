@@ -32,7 +32,7 @@ or LHS design of the matrices A and B.}
 for matrices A and B. Valid values are: 'quasirandom' (quasi-random low-discrepancy
 Sobol' sequences) and 'lhs' (latin hypercube sampling)}
 
-\item{scrambling}{Shall scrambling be applied to the quasi-random sequences? 
+\item{scrambling}{Shall scrambling be applied to the quasi-random sequences?
 Default value: 'none'. See \code{\link[randtoolbox]{sobol}}.}
 
 \item{subsamp}{If given, sensitivity indices will be calculated for
@@ -53,7 +53,8 @@ If > 1, packages \code{\link[doMC]{doMC}} (Linux only!) and \code{\link[parallel
 are needed. Values > 1 only useful if \code{fun} is very complex and computationally
 demanding, otherwise multiple thread handling will cause function slowdown! Default: 1.}
 
-\item{verbose}{logical, should progress messages be printed out to the screen?}
+\item{verbose}{logical, should progress messages be printed out to the screen?
+If \code{fn} returns multivariate output, there might be superfluous output messages!}
 
 \item{full.output}{logical, should the sampling matrices 'A' and 'B' along with all
 the input factor sets and its corresponding outputs of 'fn' be included in the output
@@ -76,59 +77,70 @@ calculation of sensitivity indices, before compiling the output. Default: \code{
 For each output of \code{fn} an optionally named (sub-)list with the following elements:
 
  *) N                      : number of input factor samples employed in the SA
- 
+
  *) fn.counts              : total number of model evaluations
- 
+
  *) Si                     : First order sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
- 
+
  *) St                     : Total effects sensitivity indices for each of the K input factors (if \code{Nb > 1} this is the mean of the bootstrapping distribution)
- 
+
  *) ranking                : Importance ranking each of the K input factors according to Si
- 
+
  If \code{Nb > 1} in addition:
- 
+
  *) Si.sd                  : Standard deviation of the Si bootrstapping distribution
- 
+
  *) Si.lo                  : Lower bound of the confidence interval of Si (defined by significance level \code{Nb.sig})
 
  *) Si.up                  : Upper bound of the confidence interval of Si (defined by significance level \code{Nb.sig})
- 
+
  *) St.sd                  : Standard deviation of the St bootrstapping distribution
- 
+
  *) St.lo                  : Lower bound of the confidence interval of St (defined by significance level \code{Nb.sig})
 
  *) St.up                  : Upper bound of the confidence interval of St (defined by significance level \code{Nb.sig})
- 
+
  *) ranking.boot           : As ranking above, but for each bootstrapping sample
-   
+
  OPTIONAL (if \code{full.output = TRUE}):
 
  *) Matrix.A               : Sampling matrix A of dimension (N, K)
- 
+
  *) Matrix.B               : Sampling matrix B of dimension (N, K)
- 
+
  *) Matrix.Ab              : Re-sampled matrix Ab (radial sampling) of dimension (N*K, K)
- 
+
  *) fn.A                   : N-dimensional vector of fn evaluations for Matrix A
- 
+
  *) fn.B                   : N-dimensional vector of fn evaluations for Matrix B
- 
+
  *) fn.Ab                  : Matrix of fn evaluations for Matrix Ab of dimension (N, K)
- 
+
  If \code{Nb > 1} in addition:
- 
+
  *) Si.boot                : Matrix of Si bootstrapping distribution of dimension (Nb, K)
- 
+
  *) St.boot                : Matrix of St bootstrapping distribution of dimension (Nb, K)
- 
+
  *) B                      : Bootstrap matrix (indices for resampling of fn.A, fn.B, and fn.Ab) of dimension (N, Nb)
- 
+
  NOTE: if argument \code{subsamp} was given, each sensitivity index vector or matrix
  as well as matrix B will be extended by a dimension giving the results for each the sub-sample.
 }
 \description{
-Variance based Sensitivity analysis for the input factors of a 
+Variance based Sensitivity analysis for the input factors of a
 hydrological model following Saltelli et al., 2010.
+}
+\note{
+If \code{debug = TRUE}, backup files \code{vbsa_backup3.RData} and \code{vbsa_backup4.RData}
+will contain reasonable output only if \code{fn} returns a single value! Otherwise the output
+in these two files relate to the last output variable in the output list/vector of \code{fn}!
+
+If \code{fn} returns (lots of) values equal to zero, no total variance can be computed
+and \code{NA} will be returned for the respective cases (a warning will be given).
+Note that NA values might cause trouble with some output metrics! Unless it is a problem
+with your model, you could try to increase \code{N} and/or reduce subsampling intervalls
+(i.e. increase N for each subsample) to avoid NAs.
 }
 \examples{
  if ( !require(randtoolbox) ) install.packages(randtoolbox)
@@ -136,32 +148,32 @@ hydrological model following Saltelli et al., 2010.
 
  nparam <- 3
 
- # Example: Ishigami test function 
+ # Example: Ishigami test function
  ishigami <- function(x, a=7, b=0.1) {
-   sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) 
+   sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1])
  }
- 
+
  set.seed(123) # for reproducible results
- 
+
  res <- vbsa(
-   fn="ishigami", 
+   fn="ishigami",
    rtype = "quasirandom",
-   lower=rep(-pi, nparam), 
+   lower=rep(-pi, nparam),
    upper=rep(pi, nparam),
    N=2000, scrambling="none"
  )
- 
+
 }
 \references{
 Theory:
- 
+
  Andrea Saltelli, Paola Annoni, Ivano Azzini, Francesca Campolongo,
  Marco Ratto, Stefano Tarantola, Variance based sensitivity
  analysis of model output. Design and estimator for the total
  sensitivity index, Computer Physics Communications, Volume 181,
  Issue 2, February 2010, Pages 259-270, DOI: 10.1016/j.cpc.2009.09.018.
  \url{http://www.sciencedirect.com/science/article/pii/S0010465509003087}
- 
+
  Code based on R-script by Mauricio Zambrano-Bigiarini obtained from
  \url{https://ec.europa.eu/jrc/en/samo/simlab} (version from 20-May-2013),
  based on Matlab code by Stefano Tarantola

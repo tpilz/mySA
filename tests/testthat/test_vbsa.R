@@ -45,6 +45,18 @@ ishigami_multi_list_err <- function(x, a=7, b=0.1) {
   }
   return(res)
 }
+ishigami_multi_na <- function(x, a=7, b=0.1) {
+  res <- sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) 
+  a=6
+  b=0.15
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  a=8
+  b=0.05
+  res <- c(res, sin(x[1]) + a*(sin(x[2]))^2 + b*(x[3]^4)*sin(x[1]) )
+  names(res) <- c("res1", "res2", "res3")
+  res[2] <- 0 # always zero to provoke zero variance and NAs in output
+  return(res)
+}
 
 nparam <- 3
 pars_lower <- rep(-pi, nparam)
@@ -220,4 +232,17 @@ test_that("multivariate output of type list of 'fn' can be handled as expected",
 test_that("unsupported output types of 'fn' are catched", {
   expect_error(vbsa(fn = "ishigami_multi_list_err", lower = pars_lower, upper = pars_upper),
                "Outputs of 'fn' (objects yA, yB, yAb) are of unexpected types", fixed =T)
+})
+
+test_that("function warns of NAs in output but returns reasonable results", {
+  # provoke NAs due to zero values in output
+  expect_warning(vbsa(fn = "ishigami_multi_na", lower = pars_lower, upper = pars_upper), fixed = T,
+                 "Output contains NA values! Read Notes section in the documentation for information regarding NAs!")
+  res_na <- suppressWarnings(vbsa(fn = "ishigami_multi_na", lower = pars_lower, upper = pars_upper))
+  expect_type(res_na, "list")
+  expect_length(res_na, 3)
+  invisible(lapply(res_na, function(x) expect_length(x, 5)))
+  expect_named(res_na, c("res1", "res2", "res3"))
+  expect_true(all(is.na(res_na$res2$Si)))
+  expect_true(all(is.na(res_na$res2$St)))
 })
