@@ -312,6 +312,21 @@ vbsa <- function(
     if(verbose) message(paste("[ Evaluation of matrix Ab, involves", N*K, "calls of fn ]"))
     yAb <- apply(Ab, 1, function(x) unlist(fn(x, ...)))
   }
+  
+  # if 'fn' returns single NAs, try to convert results to matrix
+  y.to.mat <- function(x) {
+    if(any(is.na(x))) {
+      x <- rep(NA, length(param.IDs))
+      names(x) <- param.IDs
+    }
+    return(x)
+  }
+  if(any(is.na(yA), is.na(yB), is.na(yAb)) & any(is.list(yA), is.list(yB), is.list(yAb))) {
+    warning("Function 'fn' produced NAs! Try to calculate indices anyway but check the results!")
+    yA <- sapply(yA, y.to.mat)
+    yB <- sapply(yB, y.to.mat)
+    yAb <- sapply(yAb, y.to.mat)
+  }
 
   if(debug) save(list = ls(all.names = TRUE), file = "vbsa_backup2.RData")
 
