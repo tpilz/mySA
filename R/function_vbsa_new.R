@@ -319,7 +319,7 @@ vbsa <- function(
   environment(eval_fn) <- environment()
 
   # evaluate and compile SA results for each output function of fn
-  if(all(is.matrix(yA), is.matrix(yB), is.matrix(yAb))) {
+  if(all(is.matrix(yA), is.matrix(yB), is.matrix(yAb)) & all(!is.list(yA), !is.list(yB), !is.list(yAb))) {
     if(verbose) message("[ NOTE: found multivariate output of 'fn' calls ]")
     out <- lapply(1:nrow(yA), function(i) eval_fn(yA[i,], yB[i,], yAb[i,]))
     names(out) <- rownames(yA)
