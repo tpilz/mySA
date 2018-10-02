@@ -197,6 +197,7 @@ check_output <- function(yA, yB, yAb, A, B, Ab, N, K, subsamp, nparamsets, na.ha
       }
       N <- N - length(n_na)
       if(!is.null(subsamp)) subsamp[length(subsamp)] <- N
+      if(!is.null(subsamp) && any(subsamp > N)) subsamp <- subsamp[-which(subsamp > N)]
       nparamsets  <- N*(K+2)
       A <- A[-n_na,]
       yA <- yA[-n_na]
