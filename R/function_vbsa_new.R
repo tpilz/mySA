@@ -336,7 +336,11 @@ vbsa <- function(
   # evaluate and compile SA results for each output function of fn
   if(all(is.matrix(yA), is.matrix(yB), is.matrix(yAb)) & all(!is.list(yA), !is.list(yB), !is.list(yAb))) {
     if(verbose) message("[ NOTE: found multivariate output of 'fn' calls ]")
-    out <- lapply(1:nrow(yA), function(i) eval_fn(yA[i,], yB[i,], yAb[i,]))
+    if(ncores > 1 && nrow(yA) >= ncores) {
+      out <- foreach(i=1:nrow(yA), .errorhandling = "stop") %dopar% eval_fn(yA[i,], yB[i,], yAb[i,])
+    } else {
+      out <- lapply(1:nrow(yA), function(i) eval_fn(yA[i,], yB[i,], yAb[i,]))
+    }
     names(out) <- rownames(yA)
   } else if(all(is.vector(yA, mode = "numeric"), is.vector(yB, mode = "numeric"), is.vector(yAb, mode = "numeric"))){
     out <- eval_fn(yA, yB, yAb)
