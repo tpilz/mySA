@@ -4,13 +4,13 @@ Title: My personal functions for Sensitivity Analysis
 Description: Provides functions for Sensitivity Analyses. Adapted to my personal needs.
 Author: Tobias Pilz <tpilz@uni-potsdam.de>
 Maintainer: Tobias Pilz <tpilz@uni-potsdam.de>
-Depends: lhs,randtoolbox,doMC,parallel
+Depends: lhs,randtoolbox,doMC,parallel,tidyverse
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyLoad: yes
 Authors@R: c(person(given="Tobias", family="Pilz", email="tpilz@uni-potsdam.de", role=c("aut",
            "cre", "cph")) )
-Version: 0.4.1
-Date: 2018-09-27
+Version: 0.4.2
+Date: 2018-10-05
 RoxygenNote: 6.1.0
 Suggests: testthat

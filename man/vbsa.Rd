@@ -8,7 +8,7 @@ vbsa(fn, ..., lower = -Inf, upper = Inf, N = 1000,
   rtype = c("quasirandom", "lhs"), scrambling = c("Owen",
   "Faure-Tezuka", "Owen+Faure-Tezuka", "none"), subsamp = NULL, Nb = 1,
   Nb.sig = 0.05, ncores = 1, verbose = TRUE, full.output = FALSE,
-  na.handle = "stop", debug = FALSE)
+  na.handle = "stop", debug = FALSE, restart = NULL)
 }
 \arguments{
 \item{fn}{character with the name of a valid R function to be analised.
@@ -72,6 +72,10 @@ and generation of sampling matrices; \code{vbsa_backup2.RData} after evaluation 
 \code{fn}; \code{vbsa_backup3.RData} after checking (and possibliy alterating if
 \code{na.handle = TRUE}) the output of \code{fn}; \code{vbsa_backup4.RData} after
 calculation of sensitivity indices, before compiling the output. Default: \code{FALSE}.}
+
+\item{restart}{Character list of two elements: 'backup': path to backup files
+created by a previous run with \code{debug = TRUE}; 'log': path to logfiles
+containing parameter values and \code{fn} outputs from a previous run (dee details).}
 }
 \value{
 For each output of \code{fn} an optionally named (sub-)list with the following elements:
@@ -130,6 +134,20 @@ For each output of \code{fn} an optionally named (sub-)list with the following e
 \description{
 Variance based Sensitivity analysis for the input factors of a
 hydrological model following Saltelli et al., 2010.
+}
+\details{
+There is an option to re-start previous function executions that terminated with
+an error. To do so, use argument \code{restart}. However, currently this is still
+rather unflexible. There must be logfiles in directory \code{restart$log} detectable
+via regexp '^log[-_0-9a-zA-Z]*.dat$'. Each file has to correspond to a single
+evaluation of \code{fn}. It must be a table with the elements 'group' (requires
+entries 'pars' and 'output'), 'variable' (the parameter and output element names),
+and 'value' (the actual parameter / output value). Internally, the parameter
+realisations found in the logfiles will be compared to the parameter matrices stored
+in debug file 'vbsa_backup1.RData'. Missing evaluations of \code{fn} will then be
+conducted and sensitivity indices be calculated. If \code{restart$log = NULL},
+only the indices will be calculated based on information stored in 'vbsa_backup2.RData',
+which will be required.
 }
 \note{
 If \code{debug = TRUE}, backup files \code{vbsa_backup3.RData} and \code{vbsa_backup4.RData}
