@@ -145,7 +145,9 @@
 #' in debug file 'vbsa_backup1.RData'. Missing evaluations of \code{fn} will then be
 #' conducted and sensitivity indices be calculated. If \code{restart$log = NULL},
 #' only the indices will be calculated based on information stored in 'vbsa_backup2.RData',
-#' which will be required.
+#' which will be required. For a re-start, the same parametrisation will be used,
+#' except for parameters \code{ncores}, \code{verbose}, and (obviously) \code{restart}.
+#' Changes to other parameters will be ignored!
 #'
 #' @references Theory:
 #'
@@ -219,11 +221,21 @@ vbsa <- function(
     if(ncores > 1)
       registerDoMC(ncores)
     
+    # save runtime parameters that might have changed for restart before they get overwritten when loading vbsa_backup1.RData
+    ncores_save <- ncores
+    verbose_save <- verbose
+    restart_save <- restart
+    
     # load vbsa_backup1.RData
     if(!file.exists(paste(restart$backup, "vbsa_backup1.RData", sep="/")))
       stop("Could not find backup file 'vbsa_backup1.RData' which is required!")
     
     load(paste(restart$backup, "vbsa_backup1.RData", sep="/"))
+    
+    # restore saved parameters
+    ncores <- ncores_save
+    verbose <- verbose_save
+    restart <- restart_save
     
     if(verbose) message("[ Loaded vbsa_backup1.RData ]")
     
@@ -375,15 +387,19 @@ vbsa <- function(
         stop("Could not merge log data with parameter matrices!")
       
       # get rows in A, B, Ab already processed and adapt matrices accordingly
-      n_A <- sort(unique(filter(dat_key, matrix == "A")$n))
+      n_A <- sort(filter(dat_key, matrix == "A")$n)
       A_save <- A
       A <- A[-n_A,]
-      n_B <- sort(unique(filter(dat_key, matrix == "B")$n))
+      n_B <- sort(filter(dat_key, matrix == "B")$n)
       B_save <- B
       B <- B[-n_B,]
-      n_Ab <- sort(unique(filter(dat_key, matrix == "Ab")$n))
+      n_Ab <- sort(filter(dat_key, matrix == "Ab")$n)
       Ab_save <- Ab
       Ab <- Ab[-n_Ab,]
+      
+      # check for duplicates
+      if(any( any(duplicated(n_A)) | any(duplicated(n_B)) | any(duplicated(n_Ab)) ))
+        stop("The same parametrisation was detected in multiple log files! There must be something wrong, check your log files!")
       
       # matrices/vectors of results
       dat_res <- dat_key %>%
@@ -422,7 +438,11 @@ vbsa <- function(
           message(paste("[ Evaluation of matrix A in parallel mode,", nrow(A), "calls of fn left ]"))
         }
       }
-      yA <- foreach(j=1:nrow(A), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(A[j,], ...))
+      if(nrow(A) > 0) {
+        yA <- foreach(j=1:nrow(A), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(A[j,], ...))
+      } else {
+        yA <- NA
+      }
       
       if(verbose) {
         if(is.null(restart)) {
@@ -431,7 +451,11 @@ vbsa <- function(
           message(paste("[ Evaluation of matrix B in parallel mode,", nrow(B), "calls of fn left ]"))
         }
       }
-      yB <- foreach(j=1:nrow(B), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(B[j,], ...))
+      if(nrow(B) > 0) {
+        yB <- foreach(j=1:nrow(B), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(B[j,], ...))
+      } else {
+        yB <- NA
+      }
       
       if(verbose) {
         if(is.null(restart)) {
@@ -440,8 +464,12 @@ vbsa <- function(
           message(paste("[ Evaluation of matrix Ab in parallel mode,", nrow(Ab), "calls of fn left ]"))
         }
       }
-      yAb <- foreach(j=1:nrow(Ab), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(Ab[j,], ...))
-      
+      if(nrow(Ab) > 0) {
+        yAb <- foreach(j=1:nrow(Ab), .combine = "cbind", .errorhandling = "pass") %dopar% unlist(fn(Ab[j,], ...))
+      } else {
+        yAb <- NA
+      }
+    
     } else {
       
       if(verbose) {
@@ -451,7 +479,11 @@ vbsa <- function(
           message(paste("[ Evaluation of matrix A,", nrow(A), "calls of fn left ]"))
         }
       }
-      yA <- apply(A, 1, function(x) unlist(fn(x, ...)))
+      if(nrow(A) > 0) {
+        yA <- apply(A, 1, function(x) unlist(fn(x, ...)))
+      } else {
+        yA <- NA
+      }
       
       if(verbose) {
         if(is.null(restart)) {
@@ -460,7 +492,11 @@ vbsa <- function(
           message(paste("[ Evaluation of matrix B,", nrow(B), "calls of fn left ]"))
         }
       }
-      yB <- apply(B, 1, function(x) unlist(fn(x, ...)))
+      if(nrow(B) > 0) {
+        yB <- apply(B, 1, function(x) unlist(fn(x, ...)))
+      } else {
+        yB <- NA
+      }
       
       if(verbose) {
         if(is.null(restart)) {
@@ -469,7 +505,12 @@ vbsa <- function(
           message(paste("[ Evaluation of matrix Ab,", nrow(Ab), "calls of fn left ]"))
         }
       }
-      yAb <- apply(Ab, 1, function(x) unlist(fn(x, ...)))
+      if(nrow(Ab) > 0) {
+        yAb <- apply(Ab, 1, function(x) unlist(fn(x, ...)))
+      } else {
+        yAb <- NA
+      }
+      
     }
     
     # if 'fn' returns single NAs, try to convert results to matrix
@@ -491,11 +532,11 @@ vbsa <- function(
   
   # merge with data from logfiles (if restart)
   if(!is.null(restart) & do_eval) {
-    yA_t[,-n_A] <- yA
+    if(nrow(A) > 0) yA_t[,-n_A] <- yA
     yA <- yA_t
-    yB_t[,-n_B] <- yB
+    if(nrow(B) > 0) yB_t[,-n_B] <- yB
     yB <- yB_t
-    yAb_t[,-n_Ab] <- yAb
+    if(nrow(Ab) > 0) yAb_t[,-n_Ab] <- yAb
     yAb <- yAb_t
     rm(yA_t, yB_t, yAb_t)
   }

@@ -147,7 +147,9 @@ realisations found in the logfiles will be compared to the parameter matrices st
 in debug file 'vbsa_backup1.RData'. Missing evaluations of \code{fn} will then be
 conducted and sensitivity indices be calculated. If \code{restart$log = NULL},
 only the indices will be calculated based on information stored in 'vbsa_backup2.RData',
-which will be required.
+which will be required. For a re-start, the same parametrisation will be used,
+except for parameters \code{ncores}, \code{verbose}, and (obviously) \code{restart}.
+Changes to other parameters will be ignored!
 }
 \note{
 If \code{debug = TRUE}, backup files \code{vbsa_backup3.RData} and \code{vbsa_backup4.RData}
