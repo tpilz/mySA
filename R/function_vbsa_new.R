@@ -539,6 +539,11 @@ vbsa <- function(
     if(nrow(Ab) > 0) yAb_t[,-n_Ab] <- yAb
     yAb <- yAb_t
     rm(yA_t, yB_t, yAb_t)
+    
+    # restore original parameter matrices
+    A <- A_save
+    B <- B_save
+    Ab <- Ab_save
   }
 
   if(debug & do_eval) save(list = ls(all.names = TRUE), file = "vbsa_backup2.RData")
