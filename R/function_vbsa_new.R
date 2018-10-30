@@ -354,7 +354,7 @@ vbsa <- function(
   if(!is.null(restart)) {
     
     # load vbsa_backup2.RData
-    if(is.null(restart$log) & file.exists(paste(restart$backup, "vbsa_backup2.RData", sep="/"))) {
+    if(file.exists(paste(restart$backup, "vbsa_backup2.RData", sep="/"))) {
       load(paste(restart$backup, "vbsa_backup2.RData", sep="/"))
       do_eval <- F
       if(verbose) message("[ Found and loaded vbsa_backup2.RData ]")
