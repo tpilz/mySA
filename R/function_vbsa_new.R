@@ -277,20 +277,18 @@ vbsa <- function(
       param.IDs <- paste("Param", 1:K, sep="")
     } else param.IDs <- rownames(X.Boundaries)
   
-    if (rtype=="quasirandom") {
-      # Backing up the original boundaries
-      lower.ini <- lower
-      upper.ini <- upper
-      X.Boundaries.ini <- X.Boundaries
-      LOWER.ini <- matrix( rep(lower.ini, N), nrow=N, byrow=TRUE)
-      UPPER.ini <- matrix( rep(upper.ini, N), nrow=N, byrow=TRUE)
-  
-      # normalising
-      lower <- rep(0, K)
-      upper <- rep(1, K)
-      X.Boundaries <- cbind(lower, upper)
-      rownames(X.Boundaries) <- param.IDs
-    } # IF end
+    # Backing up the original boundaries
+    lower.ini <- lower
+    upper.ini <- upper
+    X.Boundaries.ini <- X.Boundaries
+    LOWER.ini <- matrix( rep(lower.ini, N), nrow=N, byrow=TRUE)
+    UPPER.ini <- matrix( rep(upper.ini, N), nrow=N, byrow=TRUE)
+
+    # normalising
+    lower <- rep(0, K)
+    upper <- rep(1, K)
+    X.Boundaries <- cbind(lower, upper)
+    rownames(X.Boundaries) <- param.IDs
   
     # check for sub-sampling
     if(!is.null(subsamp)) {
@@ -322,17 +320,13 @@ vbsa <- function(
   
     # Matrices A and B
     if (rtype=="quasirandom") {
-      rs <- randtoolbox::sobol(n=N, dim=2*K, scrambling=scrambling)
-      A <- rs[, 1:K] * (UPPER.ini - LOWER.ini) + LOWER.ini
-      B <- rs[, (K+1):(2*K)] * (UPPER.ini - LOWER.ini) + LOWER.ini
+      samp <- randtoolbox::sobol(n=N, dim=2*K, scrambling=scrambling)
     } else if (rtype=="lhs") {
-      # tp corrected (rLHS which does not exist replaced by randomLHS)
-      A <- randomLHS(n=N, k = K)
-      A <- t(apply(A, 1, function(x) qunif(x, min = X.Boundaries[,1], max = X.Boundaries[,2])))
-      B <- randomLHS(n=N, k = K)
-      B <- t(apply(B, 1, function(x) qunif(x, min = X.Boundaries[,1], max = X.Boundaries[,2])))
-      # tp end
+      samp <- rbind(randomLHS(n=N, k = K), randomLHS(n=N, k = K))
     } # ELSE end
+    
+    A <- samp[, 1:K] * (UPPER.ini - LOWER.ini) + LOWER.ini
+    B <- samp[, (K+1):(2*K)] * (UPPER.ini - LOWER.ini) + LOWER.ini
   
     # Matrix Ab dim(N*K,K) by radial sampling
     Ab <- A[rep(1:nrow(A), each = K),]
